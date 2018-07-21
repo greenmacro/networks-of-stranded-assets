@@ -95,4 +95,5 @@ V(m.mfc.graph.noloops)$size <- 0
 V(m.mfc.graph.noloops)$label.cex <-1
 E(m.mfc.graph.noloops)$arrow.size <- 0.25
 ll <- ego_layout(m.mfc.graph.noloops, "B", "in", jitter=0.025, inverted = T)
-plot(m.mfc.graph.noloops, layout=ll)
+plot(ego_directed(m.mfc.graph.noloops, "B", "in"), layout=ll)
+

@@ -17,6 +17,7 @@ remove_io <- function(mat, remove_sect) {
   return(mat)
 }
 
+# Note: emode is "in", "out", "all", or "total"
 ego_shells <- function(graph, node, emode) {
   shells <- list()
   shells[[1]] <- node
@@ -37,6 +38,7 @@ ego_shells <- function(graph, node, emode) {
   return(shells)
 }
 
+# Note: emode is "in", "out", "all", or "total"
 ego_layout <- function(graph, node, emode, jitter = NULL, inverted = FALSE) {
   shells <- ego_shells(graph, node, emode)
   xy <- array(NA, dim=c(gorder(graph), 2));
@@ -66,6 +68,31 @@ ego_layout <- function(graph, node, emode, jitter = NULL, inverted = FALSE) {
     xy[shell_indices, 2] <- ys;
   }
   return(xy);
+}
+
+# Note: emode is "in", "out", "all", or "total"
+ego_directed <- function(graph, node, emode) {
+  # If "all" or "total", nothing to do
+  if (emode == "in") {
+    edel = "out"
+  } else if (emode == "out") {
+    edel = "in"
+  }  else {
+    # Either "all" or "total": nothing to do
+    return(graph)
+  } 
+  esl <- list()
+  shells <- ego_shells(graph, node, emode)
+  # Count down
+  for (i in length(shells):1) {
+    for (v in V(graph)[shells[[i]]]) {
+      esl <- c(esl,incident_edges(graph, v, mode = edel))
+    }
+  }
+  for (es in esl) {
+    retval <- delete_edges(graph, es)
+  }
+  return(retval)
 }
 
 # Input: An n x n matrix m
@@ -208,4 +235,3 @@ plot_io <- function(m) {
   # ----- END plot function ----- #
   myImagePlot(as.matrix(m),xLabels = rownames(m), yLabels = colnames(m))
 }
-
