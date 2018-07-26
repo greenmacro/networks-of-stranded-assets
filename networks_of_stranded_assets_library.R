@@ -17,6 +17,20 @@ remove_io <- function(mat, remove_sect) {
   return(mat)
 }
 
+io_entry <- function(mat, sector, type = "11") {
+  if (type == "11") {
+    return(mat[rownames(mat) %in% sector, sector])
+  } else if (type == "12") {
+    return(mat[rownames(mat) %in% sector, !colnames(mat) %in% sector])
+  } else if (type == "21") {
+    return(mat[!rownames(mat) %in% sector, sector])
+  } else if (type == "22") {
+    return(mat[!rownames(mat) %in% sector, !colnames(mat) %in% sector])
+  } else {
+    return("Error: 'type' must be '11', '12', '21', or '22'")
+  }
+}
+
 # Note: emode is "in", "out", "all", or "total"
 ego_shells <- function(graph, node, emode) {
   shells <- list()
@@ -73,24 +87,29 @@ ego_layout <- function(graph, node, emode, jitter = NULL, inverted = FALSE) {
 # Note: emode is "in", "out", "all", or "total"
 ego_directed <- function(graph, node, emode) {
   # If "all" or "total", nothing to do
-  if (emode == "in") {
-    edel = "out"
-  } else if (emode == "out") {
-    edel = "in"
-  }  else {
-    # Either "all" or "total": nothing to do
+  if (!emode %in% c("in","out")) {
     return(graph)
-  } 
-  esl <- list()
-  shells <- ego_shells(graph, node, emode)
-  # Count down
-  for (i in length(shells):1) {
-    for (v in V(graph)[shells[[i]]]) {
-      esl <- c(esl,incident_edges(graph, v, mode = edel))
-    }
   }
-  for (es in esl) {
-    retval <- delete_edges(graph, es)
+  shells <- ego_shells(graph, node, emode)
+  v_remain <- V(graph)
+  retval <- graph
+  for (shell in shells) {
+    v_remain <- difference(v_remain, V(graph)[shell])
+    for (v_ego in V(graph)[shell]) {
+      for (v_alter in v_remain) {
+        if (emode == "in") {
+          if (are_adjacent(graph, v_ego, v_alter)) {
+            edge_name <- paste(V(graph)[v_ego]$name,V(graph)[v_alter]$name,sep="|")
+            retval <- retval - edge(edge_name)
+          }
+        } else {
+          if (are_adjacent(graph, v_alter, v_ego)) {
+            edge_name <- paste(V(graph)[v_alter]$name,V(graph)[v_ego]$name,sep="|")
+            retval <- retval - edge(edge_name)
+          }
+        }
+      }
+    }
   }
   return(retval)
 }
@@ -124,11 +143,53 @@ uniform_scaling <- function(m) {
 # Backward and forward links
 #
 ###########################################
-fb_links <- function(a) {
-  leont <- solve(diag(nrow(a)) - a)
-  fl <- nrow(leont) * apply(leont,1,sum)/sum(leont)
-  bl <- nrow(leont) * apply(leont,2,sum)/sum(leont)
-  return(list(forward = fl, backward = bl))
+leontinv <- function(a) {
+  return(solve(diag(nrow(a)) - a))
+}
+
+fb_links <- function(m) {
+  # Not necessarily Leontief -- can use for Ghosh as well
+  leont <- solve(diag(nrow(m)) - m)
+  r <- nrow(leont) * apply(leont,1,sum)/sum(leont)
+  c <- nrow(leont) * apply(leont,2,sum)/sum(leont)
+  return(list(row = r, column = c))
+}
+
+# a: Leontief inter-industry matrix
+# f: Final 
+# s: named sectors
+fb_links_cella_1 <- function(a, f, s) {
+  for (type in c("11","12","21","22")) {
+    assign(paste0("a",type), io_entry(a, s, type = type))
+  }
+  if (is.null(dim(a11))) {
+    # Convert scalar to 1x1 array, if only one sector
+    a11 <- as.matrix(a11)
+    a12 <- t(as.matrix(a12))
+    a21 <- as.matrix(a21)
+  }
+  f1 <- f[s]
+  f2 <- f[!names(f) %in% s]
+  b11 <- leontinv(a11)
+  b22 <- leontinv(a22)
+  h <- solve(diag(nrow(a11)) - a11 - a12 %*% b22 %*% a21)
+  # Backward and forward links
+  bl <- sum((h - b11) %*% f1) + sum(b22 %*% a21 %*% h %*% f1)
+  fl <- sum(h %*% a12 %*% b22 %*% f2) + sum(b22 %*% a21 %*% h %*% a12 %*% b22 %*% f2)
+  return(c(bl,fl))
+}
+
+fb_links_cella <- function(a, f) {
+  bl <- vector()
+  fl <- vector()
+  for (s in names(f)) {
+    bfl <- fb_links_cella_1(a, f, s)
+    bl <- append(bl, bfl[1])
+    fl <- append(fl, bfl[2])
+  }
+  names(bl) <- names(f)
+  names(fl) <- names(f)
+  return(list(backward = bl, forward = fl))
 }
 
 ###########################################
@@ -168,6 +229,8 @@ plot_io <- function(m) {
   # From http://www.phaget4.org/R/image_matrix.html and http://www.phaget4.org/R/myImagePlot.R
   # ----- Define a function for plotting a matrix ----- #
   myImagePlot <- function(x, ...){
+    old.par <- par(no.readonly = TRUE) # all par settings which could be changed.
+    on.exit(par(old.par))
     min <- min(x)
     max <- max(x)
     yLabels <- rownames(x)

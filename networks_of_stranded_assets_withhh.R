@@ -8,7 +8,7 @@ source('networks_of_stranded_assets_library.R')
 # Read in input-output data
 #
 ################################################################################
-io.dat <- read.csv("sample_fr.csv")
+io.dat <- read.csv("sample_fr_withhh.csv")
 io.dat$total <- as.double(io.dat$total)
 
 # Make into a matrix
@@ -23,18 +23,18 @@ io.dat.mat[,1] <- NULL
 # Clean up the data (this will depend on the data set & sector codes)
 #
 ################################################################################
-#-------------------------------------------------------------------------------
-# Remove T & U
-#-------------------------------------------------------------------------------
-io.dat.mat <- remove_io(io.dat.mat, c("T","U"))
-
-#-------------------------------------------------------------------------------
-# Remove P3 and P51G (have to add them first)
-#-------------------------------------------------------------------------------
-# First, add P3 and P51 as columns, equal to zero
-io.dat.mat[,c("P3","P51")] <- 0
-# Next, aggregate
-io.dat.mat <- agg_io(io.dat.mat, "FD", c("P3","P51"))
+# #-------------------------------------------------------------------------------
+# # Remove T & U
+# #-------------------------------------------------------------------------------
+# io.dat.mat <- remove_io(io.dat.mat, c("T","U"))
+# 
+# #-------------------------------------------------------------------------------
+# # Remove P3 and P51G (have to add them first)
+# #-------------------------------------------------------------------------------
+# # First, add P3 and P51 as columns, equal to zero
+# io.dat.mat[,c("P3","P51")] <- 0
+# # Next, aggregate
+# io.dat.mat <- agg_io(io.dat.mat, "FD", c("P3","P51"))
 
 ################################################################################
 #
@@ -49,31 +49,35 @@ denom <- apply(io.z.mat, 1, sum)
 io.a.mat <- t(t(io.z.mat)/denom) # Leontief
 io.b.mat <- io.z.mat/denom # Ghosh
 
-# x.eig <- eigen(io.a.mat)
-# p.eig <- eigen(t(io.a.mat))
-# b.eig <- eigen(io.b.mat)
-# 
-# a.prim.vec <- data.frame(rownames(io.dat.mat),abs(as.numeric(x.eig$vectors[,1])),abs(as.numeric(p.eig$vectors[,1])),abs(as.numeric(b.eig$vectors[,1])))
-# names(a.prim.vec) <- c("sector", "x", "p","b")
-# a.prim.vec$net <- a.prim.vec$b - a.prim.vec$x
-# a.prim.vec$prod <- a.prim.vec$p * a.prim.vec$x
-# a.prim.vec[order(a.prim.vec$x),]
-# a.prim.vec[order(a.prim.vec$p),]
-# a.prim.vec[order(-a.prim.vec$net),]
-# a.prim.vec[order(a.prim.vec$prod),]
-# 
-# with(a.prim.vec,plot(x,p,pch=""))
-# with(a.prim.vec,text(x,p,sector,cex=0.75))
-# 
-# with(a.prim.vec,plot(net,prod,pch=""))
-# with(a.prim.vec,text(net,prod,sector,cex=0.75))
+x.eig <- eigen(io.a.mat)
+p.eig <- eigen(t(io.a.mat))
+b.eig <- eigen(t(io.b.mat))
+
+a.prim.vec <- data.frame(rownames(io.dat.mat),abs(as.numeric(x.eig$vectors[,1])),abs(as.numeric(p.eig$vectors[,1])),abs(as.numeric(b.eig$vectors[,1])))
+names(a.prim.vec) <- c("sector", "x", "p","b")
+a.prim.vec$net <- a.prim.vec$b - a.prim.vec$x
+a.prim.vec$prod <- a.prim.vec$p * a.prim.vec$x
+a.prim.vec[order(-a.prim.vec$x),]
+a.prim.vec[order(-a.prim.vec$p),]
+a.prim.vec[order(-a.prim.vec$b),]
+a.prim.vec[order(-a.prim.vec$net),]
+a.prim.vec[order(a.prim.vec$prod),]
+
+with(a.prim.vec,plot(x,p,pch=""))
+with(a.prim.vec,text(x,p,sector,cex=0.75))
+
+with(a.prim.vec,plot(net,prod,pch=""))
+with(a.prim.vec,text(net,prod,sector,cex=0.75))
+
+with(a.prim.vec,plot(b,prod,pch=""))
+with(a.prim.vec,text(b,prod,sector,cex=0.75))
 
 #-------------------------------------------------------------------------------
 # Get rid of final demand for analysis
 #-------------------------------------------------------------------------------
-io.dat.mat <- remove_io(io.dat.mat, "FD")
-io.a.mat <- remove_io(as.data.frame(io.a.mat), "FD")
-io.b.mat <- remove_io(as.data.frame(io.b.mat), "FD")
+# io.dat.mat <- remove_io(io.dat.mat, "FD")
+# io.a.mat <- remove_io(as.data.frame(io.a.mat), "FD")
+# io.b.mat <- remove_io(as.data.frame(io.b.mat), "FD")
 
 ################################################################################
 #
@@ -88,23 +92,12 @@ plot_io(io.dat.mat)
 #-------------------------------------------------------------------------------
 # Backward and forward links
 #-------------------------------------------------------------------------------
-fbl.a <- fb_links(io.a.mat)
-fbl.b <- fb_links(io.b.mat)
-m.bias <- fbl.b$forward - fbl.a$backward
-print(names(m.bias[order(m.bias, decreasing=T)]))
-print(names(m.bias[order(fbl.b$forward, decreasing=T)]))
-plot(fbl.b$forward,fbl.a$backward,pch="",xlab="forward linkages",ylab="backward linkages")
-text(fbl.b$forward,fbl.a$backward,names(fbl.a$backward),cex=0.75)
+# fbl.a <- fb_links(io.a.mat)
+# fbl.b <- fb_links(io.b.mat)
+# m.bias <- fbl.b$forward - fbl.a$backward
+# print(names(m.bias[order(m.bias, decreasing=T)]))
+# print(names(m.bias[order(fbl.b$forward, decreasing=T)]))
 
-plot(fbl.b$forward,fbl.a$backward,pch="",xlab="forward linkages",ylab="backward linkages",
-     xlim=c(1.35,1.55),ylim=c(0.25,1.75))
-text(fbl.b$forward,fbl.a$backward,names(fbl.a$backward),cex=1.00)
-
-fbl.comb <- data.frame(fbl.b$forward,fbl.a$backward)
-names(fbl.comb) <- c("forward","backward")
-fbl.comb$fw.quant <- as.integer(cut(fbl.comb$forward,quantile(fbl.comb$forward,probs=seq(0,1,0.1)),include.lowest=TRUE))
-fbl.comb$bw.quant <- as.integer(cut(fbl.comb$backward,quantile(fbl.comb$backward,probs=seq(0,1,0.1)),include.lowest=TRUE))
-print(fbl.comb[order(-fbl.comb$fw.quant,fbl.comb$bw.quant),])
 
 #-------------------------------------------------------------------------------
 # Inverted pyramid plot with minimal fully-connected network
